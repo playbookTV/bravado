@@ -1,0 +1,136 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply text-gray-900 bg-gray-50 transition-colors duration-200;
+  }
+
+  body.dark {
+    @apply text-gray-100 bg-dark-bg;
+  }
+
+  ::selection {
+    @apply bg-primary/20 text-primary;
+  }
+
+  .dark ::selection {
+    @apply bg-primary-light/20 text-primary-light;
+  }
+}
+
+@layer components {
+  /* Layout Components */
+  .container-custom {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  .section {
+    @apply py-12 sm:py-16;
+  }
+
+  /* Card Components */
+  .card {
+    @apply bg-white rounded-xl shadow-sm p-6 transition-all duration-200;
+  }
+
+  .dark .card {
+    @apply bg-dark-card shadow-lg shadow-black/10;
+  }
+
+  .card-hover {
+    @apply hover:shadow-md hover:-translate-y-0.5;
+  }
+
+  /* Button Components */
+  .btn {
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-lg font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed gap-2;
+  }
+
+  .btn-primary {
+    @apply bg-primary text-white hover:bg-primary-dark focus:ring-2 focus:ring-primary/50 focus:outline-none;
+  }
+
+  .dark .btn-primary {
+    @apply bg-primary-light hover:bg-primary focus:ring-primary-light/50;
+  }
+
+  .btn-secondary {
+    @apply bg-secondary text-white hover:bg-secondary-dark focus:ring-2 focus:ring-secondary/50 focus:outline-none;
+  }
+
+  .btn-outline {
+    @apply border-2 border-primary text-primary hover:bg-primary hover:text-white focus:ring-2 focus:ring-primary/50 focus:outline-none;
+  }
+
+  .dark .btn-outline {
+    @apply border-primary-light text-primary-light hover:bg-primary-light hover:text-dark-bg;
+  }
+
+  /* Form Components */
+  .input {
+    @apply px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-white dark:bg-dark-card dark:border-gray-600 dark:text-white dark:focus:ring-primary-light dark:focus:border-primary-light;
+  }
+
+  .select {
+    @apply px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-white dark:bg-dark-card dark:border-gray-600 dark:text-white dark:focus:ring-primary-light dark:focus:border-primary-light;
+  }
+
+  .label {
+    @apply block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1;
+  }
+
+  /* Editor Components */
+  .suggestion-popup {
+    @apply bg-white dark:bg-dark-card rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden z-50;
+    min-width: 180px;
+  }
+
+  .suggestion-item {
+    @apply px-4 py-2 hover:bg-gray-100 dark:hover:bg-dark-hover cursor-pointer text-sm dark:text-gray-200;
+  }
+
+  .suggestion-item:not(:last-child) {
+    @apply border-b border-gray-100 dark:border-gray-700;
+  }
+
+  .ProseMirror {
+    @apply prose prose-lg dark:prose-invert max-w-none outline-none min-h-[200px] px-4 py-2;
+  }
+
+  .ProseMirror p.is-editor-empty:first-child::before {
+    @apply text-gray-400 dark:text-gray-500 pointer-events-none float-left h-0;
+    content: attr(data-placeholder);
+  }
+
+  /* Loading States */
+  .loading-spinner {
+    @apply animate-spin rounded-full border-4 border-primary border-t-transparent h-8 w-8;
+  }
+
+  .dark .loading-spinner {
+    @apply border-primary-light;
+  }
+
+  /* Typography Utilities */
+  .heading-1 {
+    @apply text-3xl font-bold text-gray-900 dark:text-white;
+  }
+
+  .heading-2 {
+    @apply text-2xl font-semibold text-gray-900 dark:text-white;
+  }
+
+  .heading-3 {
+    @apply text-xl font-semibold text-gray-900 dark:text-white;
+  }
+
+  .text-body {
+    @apply text-base text-gray-600 dark:text-gray-300;
+  }
+
+  .text-small {
+    @apply text-sm text-gray-500 dark:text-gray-400;
+  }
+} 
