@@ -1,20 +1,14 @@
 import { NextApiRequest, NextApiResponse } from 'next'
 import { withRateLimit } from '../../utils/rateLimit'
+import { handleApiError } from '../../utils/api'
 import OpenAI from 'openai'
-import { SearchResult, ContentType, ContentTone, ContentLength } from '../../types/content'
+import { SearchResult, ContentType, ContentTone, ContentLength, GenerateRequest, GenerateResponse } from '../../types/content'
 
+// Initialize OpenAI client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+  dangerouslyAllowBrowser: true
 })
-
-interface GenerateRequest {
-  sources: SearchResult[]
-  settings: {
-    type: ContentType
-    tone: ContentTone
-    length: ContentLength
-  }
-}
 
 const WORD_COUNTS = {
   short: 300,
@@ -23,8 +17,19 @@ const WORD_COUNTS = {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Set JSON content type header
-  res.setHeader('Content-Type', 'application/json')
+  // Set CORS headers
+  res.setHeader('Access-Control-Allow-Credentials', 'true')
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET,DELETE,PATCH,POST,PUT')
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+  )
+
+  if (req.method === 'OPTIONS') {
+    res.status(200).end()
+    return
+  }
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -69,7 +74,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                        Your writing style is ${settings.tone}. 
                        Create content that is engaging, well-structured, and optimized for the target format.
                        Include proper HTML formatting for headings, paragraphs, and lists.
-                       Use semantic HTML tags appropriately.`,
+                       Use semantic HTML tags appropriately.
+                       Focus on creating content that is both informative and engaging.
+                       Ensure proper citation and attribution of sources.
+                       Always wrap your response in a root <article> tag.`,
             },
             {
               role: 'user',
@@ -78,40 +86,55 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           ],
           temperature: 0.7,
           max_tokens: calculateMaxTokens(settings.length),
+          stream: false
         })
 
-        const generatedHtml = completion.choices[0].message?.content || ''
+        if (!completion.choices[0]?.message?.content) {
+          throw new Error('No content generated from OpenAI')
+        }
 
-        return res.status(200).json({
-          html: generatedHtml,
-          text: stripHtml(generatedHtml),
+        const generatedHtml = completion.choices[0].message.content
+        
+        // Ensure the content is wrapped in an article tag
+        const wrappedHtml = generatedHtml.startsWith('<article>') 
+          ? generatedHtml 
+          : `<article>${generatedHtml}</article>`
+
+        const response: GenerateResponse = {
+          html: wrappedHtml,
+          text: stripHtml(wrappedHtml),
           metadata: {
-            wordCount: countWords(stripHtml(generatedHtml)),
+            wordCount: countWords(stripHtml(wrappedHtml)),
             type: settings.type,
             tone: settings.tone,
             length: settings.length,
           },
-        })
+        }
+
+        return res.status(200).json(response)
       } catch (error: any) {
         console.error('OpenAI API error:', error)
+
+        // Handle OpenAI specific errors
         if (error instanceof OpenAI.APIError) {
-          return res.status(error.status || 500).json({
-            error: 'OpenAI API error',
-            details: error.message
+          const status = error.status || 500
+          const message = error.message || 'OpenAI API error'
+          return res.status(status).json({
+            error: 'OpenAI API Error',
+            details: message,
+            code: error.code
           })
         }
-        return res.status(500).json({
-          error: 'Content generation error',
-          details: error.message || 'An unexpected error occurred'
-        })
+
+        // Handle other errors
+        const apiError = await handleApiError(error)
+        return res.status(apiError.error === 'Rate Limit Exceeded' ? 429 : 500).json(apiError)
       }
     }, 'generate')
-  } catch (error: any) {
+  } catch (error) {
     console.error('Content generation error:', error)
-    return res.status(500).json({
-      error: 'Failed to generate content',
-      details: error.message || 'An unexpected error occurred'
-    })
+    const apiError = await handleApiError(error)
+    return res.status(500).json(apiError)
   }
 }
 
@@ -140,6 +163,7 @@ Please create well-structured content that includes:
    - Use <ul> and <li> for lists
    - Use <blockquote> for quotes
    - Use <strong> and <em> for emphasis
+   - Use <cite> for source citations
 
 For ${settings.type === 'blog' ? 'blog posts' : settings.type === 'social' ? 'social media' : 'SEO content'}, 
 focus on ${
@@ -150,7 +174,9 @@ focus on ${
       : 'incorporating relevant keywords naturally'
   }.
 
-Make sure the content is original, engaging, and properly formatted with HTML tags.`
+Make sure the content is original, engaging, and properly formatted with HTML tags.
+Include proper citations and attributions for any quoted or paraphrased content.
+Wrap the entire content in an <article> tag.`
 }
 
 function calculateMaxTokens(length: ContentLength): number {

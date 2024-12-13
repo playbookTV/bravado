@@ -1,0 +1,176 @@
+Product Requirements Document (PRD)
+
+Project Name: Bravado
+Version: MVP
+Author: Leslie
+Date: December 12, 2024
+
+1. Overview
+
+1.1 Objective
+
+Bravado is an AI-powered content creation platform that combines Brave Search’s privacy-first insights with OpenAI’s generative capabilities. The goal is to enable users to create high-quality, engaging content quickly and efficiently while maintaining user privacy and control over input data.
+
+1.2 Target Audience
+ • Content Creators: Bloggers, marketers, and social media managers.
+ • Small Business Owners: Need marketing content but lack expertise.
+ • Professionals and Students: Require fast, tailored content for presentations, essays, or communication.
+
+1.3 Key Value Proposition
+
+Bravado simplifies content creation by offering:
+ 1. Privacy-first search integration (Brave Search API).
+ 2. AI-powered, customizable content generation.
+ 3. A seamless and intuitive user experience for creating blogs, captions, and SEO content.
+
+2. Features and Functionality
+
+2.1 Core Features
+
+1. Input Query and Search Integration
+ • User inputs a topic or keyword.
+ • Brave Search API fetches the top three to five relevant results.
+ • Display search results with a summary of each.
+
+2. AI-Powered Content Generation
+ • Use OpenAI API to transform selected search insights into:
+ • Blog posts.
+ • Social media captions.
+ • SEO paragraphs.
+ • Users can customize tone (formal, casual, witty, persuasive) and length (short, medium, long).
+
+3. Editable Content Preview
+ • Interactive editor to refine AI-generated content.
+ • Inline text suggestions for improvements.
+
+4. Export Options
+ • Download content as Markdown, plain text, or DOCX.
+
+5. Privacy Features
+ • No user data is stored unless explicitly saved.
+ • Clear user notifications about data usage.
+
+2.2 Post-MVP Features
+ • User Accounts: Save drafts and revisit projects.
+ • Content Templates: Pre-defined structures for blogs, ads, and emails.
+ • Collaborative Features: Share drafts for team feedback.
+ • Publishing Integrations: Direct publishing to platforms like WordPress or X.
+
+3. Functional Requirements
+
+3.1 Frontend
+ • Framework: React with Tailwind CSS.
+ • Key Features:
+ • Responsive input field for topics.
+ • Dropdowns for tone and length customization.
+ • Dynamic content preview.
+ • Export button with format selection.
+
+3.2 Backend
+ • Tech Stack: Node.js, Express.js.
+ • Endpoints:
+ • /search: Queries Brave Search API.
+ • /generate-content: Sends user query and selected data to OpenAI API.
+ • Content Processing: Combine Brave results and user inputs into a structured prompt for OpenAI.
+
+3.3 Database
+ • Supabase
+
+3.4 Hosting
+ • Frontend: Vercel.
+ • Backend: AWS Lambda or Render for serverless scalability.
+
+4. Non-Functional Requirements
+
+4.1 Performance
+ • Search query processing within two seconds.
+ • Content generation under five seconds.
+
+4.2 Scalability
+ • Support simultaneous API calls from up to one thousand users.
+ • Modular design for future feature additions.
+
+4.3 Security
+ • Use HTTPS for all communications.
+ • Store API keys securely using environment variables.
+
+4.4 Privacy
+ • Align with GDPR and CCPA standards.
+ • Clearly communicate privacy policies to users.
+
+5. User Stories
+
+5.1 As a User, I Can:
+ 1. Input a topic or keyword to generate content.
+ 2. Review and select relevant search results for AI content.
+ 3. Customize tone, length, and format of the content.
+ 4. Edit and export content in a preferred format.
+
+5.2 As an Admin, I Can:
+ 1. Monitor API usage to manage costs.
+ 2. Update and optimize the content generation logic.
+ 3. Implement new templates and prompt structures.
+
+6. Design Requirements
+
+6.1 User Interface
+ • Home Page:
+ • Topic input field.
+ • Dropdowns for tone and content type.
+ • Generate button.
+ • Content Page:
+ • Search results display with selection checkboxes.
+ • AI-generated content preview with edit options.
+ • Export buttons.
+
+6.2 Branding
+ • Bold and modern branding aligned with the name “Bravado.”
+ • Colors: Warm neutrals with confident accent colors (e.g., deep orange or teal).
+
+7. APIs and Integration
+7.1 Brave Search API
+ • Fetch relevant web results for user input.
+ • Filter out non-relevant results based on query context.
+
+7.2 OpenAI API
+ • Generate content from processed prompts.
+ • Adjust prompt parameters for tone, length, and structure.
+
+8. Development Milestones
+
+8.1 Week One:
+ • Set up project repository and basic frontend structure.
+ • Integrate Brave Search API.
+
+8.2 Week Two:
+ • Build backend endpoints for search and content generation.
+ • Integrate OpenAI API.
+
+8.3 Week Three:
+ • Develop content customization features.
+ • Create a dynamic preview editor.
+
+8.4 Week Four:
+ • Implement export functionality.
+ • Conduct testing for performance and edge cases.
+
+8.5 Week Five:
+ • Finalize UI/UX design.
+ • Deploy MVP on Vercel and AWS Lambda.
+
+9. Testing and Validation
+
+9.1 Test Cases
+ • Input edge cases (e.g., vague queries).
+ • API error handling and fallback prompts.
+ • Usability testing for content customization.
+
+9.2 Feedback Loop
+ • Gather user feedback through beta testing.
+ • Refine tone and formatting based on user preferences.
+
+10. Open Questions
+ 1. Should the MVP include multiple languages?
+ 2. What is the ideal pricing model for post-MVP (freemium, subscription)?
+ 3. How much customization should users have in formatting content?
+ 

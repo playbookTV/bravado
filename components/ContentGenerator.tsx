@@ -8,12 +8,14 @@ interface ContentGeneratorProps {
   setSearchResults: (results: SearchResult[]) => void
   setIsLoading: (loading: boolean) => void
   setContentSettings: (settings: { type: ContentType; tone: ContentTone; length: ContentLength }) => void
+  onError?: (message: string) => void
 }
 
 export default function ContentGenerator({ 
   setSearchResults, 
   setIsLoading,
-  setContentSettings 
+  setContentSettings,
+  onError
 }: ContentGeneratorProps) {
   const [topic, setTopic] = useState('')
   const [contentType, setContentType] = useState<ContentType>('blog')
@@ -42,7 +44,9 @@ export default function ContentGenerator({
   const handleSearch = async (searchTopic: string = topic) => {
     const trimmedTopic = searchTopic.trim()
     if (!trimmedTopic) {
-      setError('Please enter a search topic')
+      const errorMsg = 'Please enter a search topic'
+      setError(errorMsg)
+      onError?.(errorMsg)
       return
     }
 
@@ -62,25 +66,27 @@ export default function ContentGenerator({
         query: trimmedTopic,
         filters: validatedFilters,
       })
+
+      const { results, metadata } = response.data
       
-      if (response.data.error) {
-        throw new Error(response.data.details || response.data.error)
-      }
-      
-      if (!response.data.results || !Array.isArray(response.data.results)) {
+      if (!results || !Array.isArray(results)) {
         throw new Error('Invalid search results format')
       }
 
-      setSearchResults(response.data.results)
+      setSearchResults(results)
       setContentSettings({ type: contentType, tone, length })
+
+      // Clear any previous errors
+      setError(null)
     } catch (error: any) {
       console.error('Search failed:', error)
       let errorMessage = 'Failed to perform search'
       
       if (axios.isAxiosError(error)) {
-        const responseError = error.response?.data?.details || error.response?.data?.error
-        if (responseError) {
-          errorMessage = responseError
+        if (error.response?.data?.details) {
+          errorMessage = error.response.data.details
+        } else if (error.response?.data?.error) {
+          errorMessage = error.response.data.error
         } else if (error.code === 'ECONNABORTED') {
           errorMessage = 'Search request timed out. Please try again.'
         } else if (error.response?.status === 400) {
@@ -95,6 +101,7 @@ export default function ContentGenerator({
       }
       
       setError(errorMessage)
+      onError?.(errorMessage)
       setSearchResults([])
     } finally {
       setIsLoading(false)
@@ -118,16 +125,16 @@ export default function ContentGenerator({
               onChange={handleInputChange}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               placeholder="Enter your topic..."
-              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:placeholder-gray-400"
               required
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <select
               value={contentType}
               onChange={(e) => setContentType(e.target.value as ContentType)}
-              className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
+              className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary dark:bg-gray-800 dark:border-gray-700 dark:text-white"
             >
               <option value="blog">Blog Post</option>
               <option value="social">Social Media</option>
@@ -137,7 +144,7 @@ export default function ContentGenerator({
             <select
               value={tone}
               onChange={(e) => setTone(e.target.value as ContentTone)}
-              className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
+              className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary dark:bg-gray-800 dark:border-gray-700 dark:text-white"
             >
               <option value="formal">Formal</option>
               <option value="casual">Casual</option>
@@ -148,7 +155,7 @@ export default function ContentGenerator({
             <select
               value={length}
               onChange={(e) => setLength(e.target.value as ContentLength)}
-              className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
+              className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary dark:bg-gray-800 dark:border-gray-700 dark:text-white"
             >
               <option value="short">Short</option>
               <option value="medium">Medium</option>
@@ -160,7 +167,7 @@ export default function ContentGenerator({
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="p-3 text-sm text-red-600 bg-red-50 rounded-lg"
+              className="p-3 text-sm text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-900/10 rounded-lg"
             >
               {error}
             </motion.div>
@@ -168,7 +175,8 @@ export default function ContentGenerator({
 
           <button
             onClick={() => handleSearch()}
-            className="w-full py-2 px-4 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+            className="w-full py-2 px-4 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed dark:bg-primary-dark dark:hover:bg-primary"
+            disabled={!topic.trim()}
           >
             Generate Content
           </button>
