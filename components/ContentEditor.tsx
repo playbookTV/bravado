@@ -29,6 +29,15 @@ export default function ContentEditor({ initialContent, onChange }: ContentEdito
       setCharacterCount(editor.storage.characterCount.characters())
       onChange(html)
     },
+    editorProps: {
+      attributes: {
+        class: 'prose max-w-none w-full min-h-[300px] focus:outline-none dark:prose-invert',
+      },
+    },
+    // Fix for SSR hydration mismatch
+    editable: true,
+    injectCSS: true,
+    immediatelyRender: false,
   })
 
   const handleFormat = useCallback((type: 'bold' | 'italic' | 'heading' | 'bullet' | 'quote') => {
@@ -57,11 +66,11 @@ export default function ContentEditor({ initialContent, onChange }: ContentEdito
 
   return (
     <div className="w-full">
-      <div className="mb-4 flex items-center space-x-2 border-b border-gray-200 pb-4">
+      <div className="mb-4 flex items-center space-x-2 border-b border-gray-200 dark:border-gray-700 pb-4">
         <button
           onClick={() => handleFormat('bold')}
-          className={`p-2 rounded hover:bg-gray-100 ${
-            editor.isActive('bold') ? 'bg-gray-100' : ''
+          className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 ${
+            editor.isActive('bold') ? 'bg-gray-100 dark:bg-gray-700' : ''
           }`}
           title="Bold"
         >
@@ -71,8 +80,8 @@ export default function ContentEditor({ initialContent, onChange }: ContentEdito
         </button>
         <button
           onClick={() => handleFormat('italic')}
-          className={`p-2 rounded hover:bg-gray-100 ${
-            editor.isActive('italic') ? 'bg-gray-100' : ''
+          className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 ${
+            editor.isActive('italic') ? 'bg-gray-100 dark:bg-gray-700' : ''
           }`}
           title="Italic"
         >
@@ -82,8 +91,8 @@ export default function ContentEditor({ initialContent, onChange }: ContentEdito
         </button>
         <button
           onClick={() => handleFormat('heading')}
-          className={`p-2 rounded hover:bg-gray-100 ${
-            editor.isActive('heading', { level: 2 }) ? 'bg-gray-100' : ''
+          className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 ${
+            editor.isActive('heading', { level: 2 }) ? 'bg-gray-100 dark:bg-gray-700' : ''
           }`}
           title="Heading"
         >
@@ -93,8 +102,8 @@ export default function ContentEditor({ initialContent, onChange }: ContentEdito
         </button>
         <button
           onClick={() => handleFormat('bullet')}
-          className={`p-2 rounded hover:bg-gray-100 ${
-            editor.isActive('bulletList') ? 'bg-gray-100' : ''
+          className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 ${
+            editor.isActive('bulletList') ? 'bg-gray-100 dark:bg-gray-700' : ''
           }`}
           title="Bullet List"
         >
@@ -104,8 +113,8 @@ export default function ContentEditor({ initialContent, onChange }: ContentEdito
         </button>
         <button
           onClick={() => handleFormat('quote')}
-          className={`p-2 rounded hover:bg-gray-100 ${
-            editor.isActive('blockquote') ? 'bg-gray-100' : ''
+          className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 ${
+            editor.isActive('blockquote') ? 'bg-gray-100 dark:bg-gray-700' : ''
           }`}
           title="Quote"
         >
@@ -115,12 +124,9 @@ export default function ContentEditor({ initialContent, onChange }: ContentEdito
         </button>
       </div>
 
-      <EditorContent 
-        editor={editor} 
-        className="prose max-w-none w-full min-h-[300px] focus:outline-none"
-      />
+      <EditorContent editor={editor} />
 
-      <div className="mt-4 text-sm text-gray-500">
+      <div className="mt-4 text-sm text-gray-500 dark:text-gray-400">
         {characterCount} characters
       </div>
     </div>
