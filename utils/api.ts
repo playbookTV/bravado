@@ -1,4 +1,5 @@
 import axios, { AxiosError } from 'axios'
+import { APIStats } from '../types/content'
 
 export const API_TIMEOUT = {
   search: 2000,  // 2 seconds as per PRD
@@ -14,58 +15,108 @@ export const API_ERRORS = {
   unknown: 'An unexpected error occurred.'
 }
 
-// API Usage monitoring
-interface APIUsage {
-  timestamp: number
-  endpoint: string
-  success: boolean
-  duration: number
-  error?: string
+// API metrics storage - using a more durable solution than just let
+const apiMetrics = {
+  total: 0,
+  calls: [] as Array<{
+    timestamp: number
+    duration: number
+    success: boolean
+  }>
 }
 
-const API_USAGE_KEY = 'api_usage_logs'
-const MAX_USAGE_LOGS = 1000
+// Function to clean up old metrics
+function cleanupOldMetrics() {
+  const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000
+  apiMetrics.calls = apiMetrics.calls.filter(call => call.timestamp > twentyFourHoursAgo)
+}
 
-export function logAPIUsage(usage: APIUsage) {
+// Track API calls with proper error handling
+export function trackAPICall(duration: number, success: boolean) {
   try {
-    const logs = JSON.parse(localStorage.getItem(API_USAGE_KEY) || '[]') as APIUsage[]
-    logs.push(usage)
-    
-    // Keep only the last MAX_USAGE_LOGS entries
-    while (logs.length > MAX_USAGE_LOGS) {
-      logs.shift()
-    }
-    
-    localStorage.setItem(API_USAGE_KEY, JSON.stringify(logs))
+    apiMetrics.total++
+    apiMetrics.calls.push({
+      timestamp: Date.now(),
+      duration: Math.max(0, duration), // Ensure duration is not negative
+      success
+    })
+
+    // Clean up old metrics periodically
+    cleanupOldMetrics()
+
+    // Log for debugging
+    console.log('API Metrics Updated:', {
+      total: apiMetrics.total,
+      recentCalls: apiMetrics.calls.length
+    })
   } catch (error) {
-    console.error('Failed to log API usage:', error)
+    console.error('Error tracking API call:', error)
   }
 }
 
-export function getAPIUsageStats() {
+// Get API usage stats with error handling
+export function getAPIUsageStats(): APIStats {
   try {
-    const logs = JSON.parse(localStorage.getItem(API_USAGE_KEY) || '[]') as APIUsage[]
-    const now = Date.now()
-    const last24Hours = logs.filter(log => (now - log.timestamp) < 24 * 60 * 60 * 1000)
+    cleanupOldMetrics()
+
+    const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000
+    const recentCalls = apiMetrics.calls.filter(call => call.timestamp > twentyFourHoursAgo)
     
-    return {
-      total: logs.length,
+    const successfulCalls = recentCalls.filter(call => call.success)
+    const failedCalls = recentCalls.filter(call => !call.success)
+    
+    const totalDuration = recentCalls.reduce((sum, call) => sum + call.duration, 0)
+    const averageDuration = recentCalls.length > 0 ? totalDuration / recentCalls.length : 0
+
+    const stats = {
+      total: apiMetrics.total,
       last24Hours: {
-        total: last24Hours.length,
-        success: last24Hours.filter(log => log.success).length,
-        failed: last24Hours.filter(log => !log.success).length,
-        averageDuration: last24Hours.reduce((acc, log) => acc + log.duration, 0) / last24Hours.length,
+        total: recentCalls.length,
+        success: successfulCalls.length,
+        failed: failedCalls.length,
+        averageDuration
       }
     }
+
+    // Log for debugging
+    console.log('API Stats Retrieved:', stats)
+
+    return stats
   } catch (error) {
-    console.error('Failed to get API usage stats:', error)
-    return null
+    console.error('Error getting API stats:', error)
+    return {
+      total: 0,
+      last24Hours: {
+        total: 0,
+        success: 0,
+        failed: 0,
+        averageDuration: 0
+      }
+    }
+  }
+}
+
+// Wrapper function to track API calls
+export async function trackAPIRequest<T>(
+  requestFn: () => Promise<T>
+): Promise<T> {
+  const startTime = performance.now()
+  try {
+    const result = await requestFn()
+    const duration = performance.now() - startTime
+    trackAPICall(duration, true)
+    return result
+  } catch (error) {
+    const duration = performance.now() - startTime
+    trackAPICall(duration, false)
+    throw error
   }
 }
 
 export interface ApiErrorResponse {
   error: string
   details?: string
+  code?: string
 }
 
 export async function handleApiError(error: unknown): Promise<ApiErrorResponse> {
@@ -85,7 +136,8 @@ export async function handleApiError(error: unknown): Promise<ApiErrorResponse> 
         case 429:
           errorResponse = {
             error: 'Rate Limit Exceeded',
-            details: API_ERRORS.rateLimit
+            details: API_ERRORS.rateLimit,
+            code: 'RATE_LIMIT'
           }
           break
         case 401:
@@ -105,7 +157,10 @@ export async function handleApiError(error: unknown): Promise<ApiErrorResponse> 
           }
           break
         default:
-          errorResponse = axiosError.response.data as ApiErrorResponse
+          errorResponse = axiosError.response.data as ApiErrorResponse || {
+            error: 'Unknown Error',
+            details: API_ERRORS.unknown
+          }
       }
     } else if (axiosError.request) {
       errorResponse = {
@@ -125,51 +180,16 @@ export async function handleApiError(error: unknown): Promise<ApiErrorResponse> 
     }
   }
 
-  // Log the error
-  logAPIUsage({
-    timestamp: Date.now(),
-    endpoint: (error as any)?.config?.url || 'unknown',
-    success: false,
-    duration: Date.now() - startTime,
-    error: errorResponse.error
-  })
-
   return errorResponse
 }
 
 export function createApiClient(type: 'search' | 'generate') {
-  const startTime = Date.now()
-  const client = axios.create({
+  return axios.create({
     timeout: API_TIMEOUT[type],
     headers: {
       'Content-Type': 'application/json'
     }
   })
-
-  // Add response interceptor for logging
-  client.interceptors.response.use(
-    (response) => {
-      logAPIUsage({
-        timestamp: Date.now(),
-        endpoint: response.config.url || 'unknown',
-        success: true,
-        duration: Date.now() - startTime
-      })
-      return response
-    },
-    (error) => {
-      logAPIUsage({
-        timestamp: Date.now(),
-        endpoint: error.config?.url || 'unknown',
-        success: false,
-        duration: Date.now() - startTime,
-        error: error.message
-      })
-      return Promise.reject(error)
-    }
-  )
-
-  return client
 }
 
 // Utility function to validate Brave Search API response

@@ -63,4 +63,14 @@ export interface GenerateResponse {
     tone: ContentTone
     length: ContentLength
   }
+}
+
+export interface APIStats {
+  total: number
+  last24Hours: {
+    total: number
+    success: number
+    failed: number
+    averageDuration: number
+  }
 } 

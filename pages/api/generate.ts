@@ -134,7 +134,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   } catch (error) {
     console.error('Content generation error:', error)
     const apiError = await handleApiError(error)
-    return res.status(500).json(apiError)
+    return res.status(apiError.code === 'RATE_LIMIT' ? 429 : 500).json(apiError)
   }
 }
 
