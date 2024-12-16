@@ -1,177 +1,193 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/router'
-import { ContentType, ContentTone, ContentLength, SearchResult, GeneratedContent } from '../types/content'
-import { ErrorBoundary } from '../components/ErrorBoundary'
+import Head from 'next/head'
+import { SearchResult, ContentType, ContentTone, ContentLength } from '../types/content'
 import ContentGenerator from '../components/ContentGenerator'
-import SearchResults from '../components/SearchResults'
-import { ToastContainer } from '../components/Toast'
+import { ErrorBoundary } from '../components/ErrorBoundary'
+import { Dialog, DialogContent } from '../components/ui/dialog'
+import { Loader2 } from 'lucide-react'
+import axios from 'axios'
+import { useDrafts } from '../hooks/useDrafts'
+import { usePreferences } from '../hooks/usePreferences'
 import { useToast } from '../utils/useToast'
-import PrivacyNotice from '../components/PrivacyNotice'
-import { API_TIMEOUT } from '../utils/api'
+import AuthenticatedLayout from '../components/layout/AuthenticatedLayout'
 
 export default function Home() {
   const router = useRouter()
+  const { createDraft } = useDrafts()
+  const { preferences } = usePreferences()
+  const { error: showError } = useToast()
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
-  const [isSearching, setIsSearching] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
-  const [contentSettings, setContentSettings] = useState({
-    type: 'blog' as ContentType,
-    tone: 'casual' as ContentTone,
-    length: 'medium' as ContentLength,
-  })
-  const [showPrivacyNotice, setShowPrivacyNotice] = useState(true)
-  const { toasts, removeToast, success, error: showError, info } = useToast()
+  const [contentSettings, setContentSettings] = useState<{
+    type: ContentType
+    tone: ContentTone
+    length: ContentLength
+  } | null>(() => ({
+    type: (preferences?.default_content_type as ContentType) || 'blog',
+    tone: (preferences?.default_tone as ContentTone) || 'formal',
+    length: (preferences?.default_length as ContentLength) || 'medium',
+  }))
 
-  // Handle timeouts
-  useEffect(() => {
-    let timer: NodeJS.Timeout
-    if (isSearching) {
-      timer = setTimeout(() => {
-        setIsSearching(false)
-        showError('Search request timed out. Please try again.')
-      }, API_TIMEOUT.search)
+  const handleGenerateContent = async () => {
+    if (!searchResults.length || !contentSettings || isGenerating) return;
+
+    try {
+      setIsGenerating(true);
+      const selectedSources = searchResults.filter(result => result.selected);
+      
+      if (selectedSources.length === 0) {
+        throw new Error('Please select at least one source');
+      }
+
+      const response = await axios.post('/api/generate', {
+        sources: selectedSources,
+        settings: contentSettings
+      });
+
+      // Create a new draft with the generated content
+      const draft = await createDraft({
+        title: selectedSources[0].title,
+        content: response.data.html,
+        content_type: contentSettings.type,
+        tone: contentSettings.tone,
+        length: contentSettings.length,
+        metadata: {
+          sources: selectedSources,
+          wordCount: response.data.metadata.wordCount,
+          generatedAt: new Date().toISOString(),
+        },
+      });
+
+      if (!draft) {
+        throw new Error('Failed to save draft');
+      }
+
+      // Use replace instead of push to prevent back navigation to generation state
+      await router.replace(`/content/${draft.id}`);
+    } catch (error: any) {
+      console.error('Content generation failed:', error);
+      showError(error.message || 'Failed to generate content');
+      setIsGenerating(false);
     }
-    return () => clearTimeout(timer)
-  }, [isSearching, showError])
+  };
 
-  useEffect(() => {
-    let timer: NodeJS.Timeout
-    if (isGenerating) {
-      timer = setTimeout(() => {
-        setIsGenerating(false)
-        showError('Content generation timed out. Please try again.')
-      }, API_TIMEOUT.generate)
-    }
-    return () => clearTimeout(timer)
-  }, [isGenerating, showError])
-
-  const handleResultSelect = (index: number) => {
-    setSearchResults(results => 
-      results.map((result, i) => ({
-        ...result,
-        selected: i === index ? !result.selected : result.selected,
-      }))
+  const toggleResultSelection = (index: number) => {
+    setSearchResults(prev => 
+      prev.map((result, i) => 
+        i === index ? { ...result, selected: !result.selected } : result
+      )
     )
   }
 
-  const handleGenerate = async () => {
-    const selectedResults = searchResults.filter(result => result.selected)
-    if (selectedResults.length === 0) {
-      showError('Please select at least one search result')
-      return
-    }
-
-    setIsGenerating(true)
-    try {
-      const response = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({
-          sources: selectedResults,
-          settings: contentSettings,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.details || data.error || 'Failed to generate content')
-      }
-
-      if (!data.html || typeof data.html !== 'string') {
-        throw new Error('Invalid response format from server')
-      }
-
-      // Generate a unique ID for the content
-      const contentId = Date.now().toString(36) + Math.random().toString(36).substring(2)
-      
-      // Save the content to localStorage
-      localStorage.setItem(`content-${contentId}`, JSON.stringify(data))
-      
-      // Redirect to the content page
-      success('Content generated successfully')
-      router.push(`/content/${contentId}`)
-    } catch (error: any) {
-      console.error('Content generation failed:', error)
-      showError(error.message || 'Failed to generate content. Please try again.')
-    } finally {
-      setIsGenerating(false)
-    }
-  }
-
-  const handlePrivacyAccept = () => {
-    setShowPrivacyNotice(false)
-    info('You can always review our privacy policy in the footer')
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <AuthenticatedLayout>
+      <Head>
+        <title>Content Generator - Bravado</title>
+        <meta name="description" content="AI-powered content generation tool" />
+      </Head>
+
       <ErrorBoundary>
-        <ToastContainer toasts={toasts} removeToast={removeToast} />
-        
-        {showPrivacyNotice && (
-          <PrivacyNotice
-            onAccept={handlePrivacyAccept}
-            onLearnMore={() => window.open('/privacy', '_blank')}
-          />
-        )}
-        
-        <main className="container mx-auto px-4 py-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="max-w-4xl mx-auto space-y-8"
+        <AnimatePresence mode="wait">
+          <motion.main
+            key="main"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="container mx-auto px-4 py-8 space-y-8"
           >
-            {/* Search Section */}
-            <section className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
-              <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">Bravado</h1>
+            <Dialog open={isGenerating} onOpenChange={setIsGenerating}>
+              <DialogContent className="sm:max-w-md" showClose={false}>
+                <div className="flex flex-col items-center justify-center p-6 space-y-4">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                  <h3 className="text-lg font-semibold text-center">Generating Content</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
+                    Please wait while we generate your content. This may take a few moments...
+                  </p>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+            >
               <ContentGenerator
                 setSearchResults={setSearchResults}
-                setIsLoading={setIsSearching}
+                setIsLoading={setIsLoading}
                 setContentSettings={setContentSettings}
-                onError={showError}
+                defaultSettings={contentSettings}
               />
-            </section>
+            </motion.div>
 
-            {/* Search Results */}
-            <AnimatePresence>
-              {isSearching && (
+            {searchResults.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="space-y-4"
+              >
+                <h2 className="text-2xl font-bold">Search Results</h2>
+                <div className="grid gap-4">
+                  {searchResults.map((result, index) => (
+                    <motion.div
+                      key={result.url}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      className={`p-4 rounded-lg border ${
+                        result.selected
+                          ? 'border-primary bg-primary/5'
+                          : 'border-gray-200 dark:border-gray-700'
+                      } cursor-pointer hover:border-primary transition-colors`}
+                      onClick={() => toggleResultSelection(index)}
+                    >
+                      <h3 className="font-semibold mb-2">{result.title}</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-300">
+                        {result.snippet}
+                      </p>
+                      <div className="mt-2 text-xs text-gray-500">
+                        {result.meta.publishedDate && (
+                          <span className="mr-4">
+                            Published: {new Date(result.meta.publishedDate).toLocaleDateString()}
+                          </span>
+                        )}
+                        <span>Language: {result.meta.language}</span>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="flex justify-center py-8"
+                  transition={{ delay: 0.4 }}
+                  className="flex justify-end"
                 >
-                  <div className="loading-spinner dark:border-white" />
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {searchResults.length > 0 && !isSearching && (
-              <section className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Search Results</h2>
                   <button
-                    onClick={handleGenerate}
-                    disabled={!searchResults.some(r => r.selected) || isGenerating}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-green-700 dark:hover:bg-green-600"
+                    onClick={handleGenerateContent}
+                    disabled={isGenerating || !searchResults.some(r => r.selected)}
+                    className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isGenerating ? 'Generating...' : 'Generate Content'}
+                    {isGenerating ? (
+                      <>
+                        <Loader2 className="inline-block mr-2 h-4 w-4 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      'Generate Content'
+                    )}
                   </button>
-                </div>
-                <SearchResults
-                  results={searchResults}
-                  onSelect={handleResultSelect}
-                />
-              </section>
+                </motion.div>
+              </motion.div>
             )}
-          </motion.div>
-        </main>
+          </motion.main>
+        </AnimatePresence>
       </ErrorBoundary>
-    </div>
+    </AuthenticatedLayout>
   )
 } 

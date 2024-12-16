@@ -31,6 +31,7 @@ export interface GeneratedContent {
   html: string
   text: string
   metadata: {
+    title: string
     wordCount: number
     type: ContentType
     tone: ContentTone

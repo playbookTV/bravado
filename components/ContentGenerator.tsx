@@ -1,14 +1,21 @@
-import React, { useState, useRef } from 'react'
+import React, { useState } from 'react'
 import { motion } from 'framer-motion'
+import { SearchResult, ContentType, ContentTone, ContentLength, SearchFilters } from '../types/content'
 import axios from 'axios'
-import { ContentType, ContentTone, ContentLength, SearchResult } from '../types/content'
-import SearchFilters from './SearchFilters'
+import { Button } from './ui/button'
+import { Input } from './ui/input'
+import { Label } from './ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
+import { Card } from './ui/card'
+import { AlertCircle, Loader2 } from 'lucide-react'
+import { Alert, AlertDescription } from './ui/alert'
+import { Dialog, DialogContent } from './ui/dialog'
 
 interface ContentGeneratorProps {
   setSearchResults: (results: SearchResult[]) => void
   setIsLoading: (loading: boolean) => void
   setContentSettings: (settings: { type: ContentType; tone: ContentTone; length: ContentLength }) => void
-  onError?: (message: string) => void
+  onError?: (error: string) => void
 }
 
 export default function ContentGenerator({ 
@@ -18,27 +25,21 @@ export default function ContentGenerator({
   onError
 }: ContentGeneratorProps) {
   const [topic, setTopic] = useState('')
+  const [error, setError] = useState<string | null>(null)
   const [contentType, setContentType] = useState<ContentType>('blog')
   const [tone, setTone] = useState<ContentTone>('formal')
   const [length, setLength] = useState<ContentLength>('medium')
-  const [error, setError] = useState<string | null>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  const [filters, setFilters] = useState({
-    timeRange: 'any',
+  const [isSearching, setIsSearching] = useState(false)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [filters, setFilters] = useState<SearchFilters>({
+    resultCount: 5,
     language: 'en',
     safeSearch: 'moderate',
-    resultCount: 5,
+    timeRange: 'month'
   })
 
-  const handleFilterChange = (key: string, value: string | number) => {
-    setFilters(prev => ({ ...prev, [key]: value }))
-  }
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value
-    setTopic(value)
-    setError(null)
+    setTopic(e.target.value)
   }
 
   const handleSearch = async (searchTopic: string = topic) => {
@@ -50,7 +51,7 @@ export default function ContentGenerator({
       return
     }
 
-    setIsLoading(true)
+    setIsSearching(true)
     setError(null)
 
     try {
@@ -104,84 +105,119 @@ export default function ContentGenerator({
       onError?.(errorMessage)
       setSearchResults([])
     } finally {
-      setIsLoading(false)
+      setIsSearching(false)
     }
   }
 
   return (
-    <div className="relative">
-      <div className="space-y-6">
-        <SearchFilters
-          filters={filters}
-          onFilterChange={handleFilterChange}
-        />
+    <>
+      <Dialog open={isGenerating} onOpenChange={setIsGenerating}>
+        <DialogContent className="sm:max-w-md" showClose={false}>
+          <div className="flex flex-col items-center justify-center p-6 space-y-4">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+            <h3 className="text-lg font-semibold text-center">Generating Content</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
+              Please wait while we generate your content. This may take a few moments...
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
 
+      <Card className="p-6">
         <div className="space-y-4">
-          <div className="relative">
-            <input
-              ref={inputRef}
-              type="text"
+          <div>
+            <Label htmlFor="topic">Search Topic</Label>
+            <Input
+              id="topic"
+              placeholder="Enter your topic..."
               value={topic}
               onChange={handleInputChange}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              placeholder="Enter your topic..."
-              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:placeholder-gray-400"
-              required
+              disabled={isSearching || isGenerating}
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <select
-              value={contentType}
-              onChange={(e) => setContentType(e.target.value as ContentType)}
-              className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary dark:bg-gray-800 dark:border-gray-700 dark:text-white"
-            >
-              <option value="blog">Blog Post</option>
-              <option value="social">Social Media</option>
-              <option value="seo">SEO Content</option>
-            </select>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <Label htmlFor="type">Content Type</Label>
+              <Select
+                value={contentType}
+                onValueChange={(value: ContentType) => setContentType(value)}
+                disabled={isSearching || isGenerating}
+              >
+                <SelectTrigger id="type">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="blog">Blog Post</SelectItem>
+                  <SelectItem value="social">Social Media</SelectItem>
+                  <SelectItem value="seo">SEO Content</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-            <select
-              value={tone}
-              onChange={(e) => setTone(e.target.value as ContentTone)}
-              className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary dark:bg-gray-800 dark:border-gray-700 dark:text-white"
-            >
-              <option value="formal">Formal</option>
-              <option value="casual">Casual</option>
-              <option value="witty">Witty</option>
-              <option value="persuasive">Persuasive</option>
-            </select>
+            <div>
+              <Label htmlFor="tone">Writing Tone</Label>
+              <Select
+                value={tone}
+                onValueChange={(value: ContentTone) => setTone(value)}
+                disabled={isSearching || isGenerating}
+              >
+                <SelectTrigger id="tone">
+                  <SelectValue placeholder="Select tone" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="formal">Formal</SelectItem>
+                  <SelectItem value="casual">Casual</SelectItem>
+                  <SelectItem value="witty">Witty</SelectItem>
+                  <SelectItem value="persuasive">Persuasive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-            <select
-              value={length}
-              onChange={(e) => setLength(e.target.value as ContentLength)}
-              className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary dark:bg-gray-800 dark:border-gray-700 dark:text-white"
-            >
-              <option value="short">Short</option>
-              <option value="medium">Medium</option>
-              <option value="long">Long</option>
-            </select>
+            <div>
+              <Label htmlFor="length">Content Length</Label>
+              <Select
+                value={length}
+                onValueChange={(value: ContentLength) => setLength(value)}
+                disabled={isSearching || isGenerating}
+              >
+                <SelectTrigger id="length">
+                  <SelectValue placeholder="Select length" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="short">Short</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="long">Long</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {error && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="p-3 text-sm text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-900/10 rounded-lg"
-            >
-              {error}
-            </motion.div>
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           )}
 
-          <button
-            onClick={() => handleSearch()}
-            className="w-full py-2 px-4 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed dark:bg-primary-dark dark:hover:bg-primary"
-            disabled={!topic.trim()}
-          >
-            Generate Content
-          </button>
+          <div className="flex justify-end">
+            <Button 
+              onClick={() => handleSearch()} 
+              disabled={isSearching || isGenerating}
+              className="w-full sm:w-auto"
+            >
+              {isSearching ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Searching...
+                </>
+              ) : (
+                'Start Search'
+              )}
+            </Button>
+          </div>
         </div>
-      </div>
-    </div>
+      </Card>
+    </>
   )
 } 
